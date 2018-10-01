@@ -1,162 +1,106 @@
--- TODO: later in development we will use CREATE EXTENSION
---
--- Documentation:
---
--- this package has been made to give people a quick overview of 
--- permissions assigned to people. basically it is a set of view
--- which all have the same structure to make sure that we can
--- query ONE view to fetch all the data at once.
--- it will allow you to fetch ALL information for a user in ONE
--- step easily.
--- 
--- just run ... SELECT * FROM permissions.all_permissions 
--- to figure out.
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+\echo Use "CREATE EXTENSION pg_permissions" to load this file. \quit
 
-------------------------------------------------------------------
-BEGIN;
-
-CREATE SCHEMA permissions;
-
-SET search_path TO permissions;
-
-CREATE FUNCTION generate_tablename(name, name) 
-RETURNS text AS
-$$
-	SELECT quote_ident($1) || '.' || quote_ident($2);
-$$
-LANGUAGE 'sql' IMMUTABLE PARALLEL SAFE;
-
--- permissions on tables
 CREATE VIEW table_permissions AS
-	WITH list AS (SELECT unnest AS perm 
-			FROM unnest ('{"INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"}'::text[]))
-	SELECT		'table' AS object_type,
-			rolname AS username,
-			schemaname AS object,
-			tablename  AS sub_object,
-			NULL::text AS sub_sub_object,
-			perm_list.perm AS permission,
-			has_table_privilege(rolname, generate_tablename(schemaname, tablename), perm_list.perm) AS has_permission
-	FROM		pg_tables, pg_authid, LATERAL (SELECT * FROM list) AS perm_list 
-	WHERE		schemaname NOT IN ('information_schema', 'pg_catalog')
-	ORDER BY 1, 2, 3, 4
-;
+SELECT TEXT 'table' AS object_type,
+       r.rolname AS role_name,
+       t.relnamespace::regnamespace::name AS schema_name,
+       t.relname::text AS object_name,
+       NULL::name AS subobject_name,
+       p.perm AS permission,
+       has_table_privilege(r.oid, t.oid, p.perm) AS granted
+FROM pg_catalog.pg_class AS t
+   CROSS JOIN pg_catalog.pg_roles AS r
+   CROSS JOIN (VALUES (TEXT 'INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) AS p(perm)
+WHERE t.relnamespace::regnamespace::name <> 'information_schema'
+  AND t.relnamespace::regnamespace::name NOT LIKE 'pg_%'
+  AND t.relkind = 'r';
 
--- permissions on views
 CREATE VIEW view_permissions AS
-	WITH list AS (SELECT unnest AS perm 
-			FROM unnest ('{"INSERT", "UPDATE", "DELETE", "TRIGGER"}'::text[]))
-	SELECT		'view' AS object_type,
-			rolname AS username,
-			schemaname AS object,
-			viewname  AS sub_object,
-			NULL::text AS sub_sub_object,
-			perm_list.perm AS permission,
-			has_table_privilege(rolname, generate_tablename(schemaname, viewname), perm_list.perm) AS has_permission
-	FROM		pg_views, pg_authid, LATERAL (SELECT * FROM list) AS perm_list 
-	WHERE		schemaname NOT IN ('information_schema', 'pg_catalog')
-	ORDER BY 1, 2, 3, 4
-;
+WITH list AS (SELECT unnest AS perm 
+        FROM unnest ('{"INSERT", "UPDATE", "DELETE", "TRIGGER"}'::text[]))
+SELECT TEXT 'view' AS object_type,
+       r.rolname AS role_name,
+       t.relnamespace::regnamespace::name AS schema_name,
+       t.relname::text AS object_name,
+       NULL::name AS subobject_name,
+       p.perm AS permission,
+       has_table_privilege(r.oid, t.oid, p.perm) AS granted
+FROM pg_catalog.pg_class AS t
+   CROSS JOIN pg_catalog.pg_roles AS r
+   CROSS JOIN (VALUES ('INSERT'), ('UPDATE'), ('DELETE'), ('TRIGGER')) AS p(perm)
+WHERE t.relnamespace::regnamespace::name <> 'information_schema'
+  AND t.relnamespace::regnamespace::name NOT LIKE 'pg_%'
+  AND t.relkind = 'v';
 
--- column permissions
 CREATE VIEW column_permissions AS
-	WITH list AS (SELECT unnest AS perm 
-			FROM unnest ('{"SELECT", "INSERT", "UPDATE", "REFERENCES"}'::text[]))
-	SELECT		'column' AS object_type,
-			rolname AS username,
-			schemaname AS object,
-			tablename  AS sub_object,
-			col.colname::text AS sub_sub_object,
-			perm_list.perm AS permission,
-			has_column_privilege(rolname, generate_tablename(schemaname, tablename), 
-				col.colname, perm_list.perm) AS has_permission
-	FROM		(SELECT	schemaname, tablename
-				FROM pg_tables
-			 UNION ALL
-			 SELECT schemaname, viewname
-				FROM pg_views) AS relations, 
-			pg_authid, 
-			LATERAL (SELECT * FROM list) AS perm_list, 
-			LATERAL (SELECT a.attname AS colname
-				 FROM pg_catalog.pg_attribute a
-				 WHERE a.attrelid = generate_tablename(schemaname, tablename)::regclass::oid 
-					AND a.attnum > 0 
-					AND NOT a.attisdropped
-					ORDER BY a.attnum
-				) AS col
-	WHERE		schemaname NOT IN ('information_schema', 'pg_catalog')
-	ORDER BY 1, 2, 3, 4
-;
+SELECT TEXT 'column' AS object_type,
+       r.rolname AS role_name,
+       t.relnamespace::regnamespace::name AS schema_name,
+       t.relname::text AS object_name,
+       c.attname AS subobject_name,
+       p.perm AS permission,
+       has_column_privilege(r.oid, t.oid, c.attnum, p.perm) AS granted
+FROM pg_catalog.pg_class AS t
+   JOIN pg_catalog.pg_attribute AS c ON t.oid = c.attrelid
+   CROSS JOIN pg_catalog.pg_roles AS r
+   CROSS JOIN (VALUES ('INSERT'), ('UPDATE'), ('SELECT'), ('REFERENCES')) AS p(perm)
+WHERE t.relnamespace::regnamespace::name <> 'information_schema'
+  AND t.relnamespace::regnamespace::name NOT LIKE 'pg_%'
+  AND c.attnum > 0 AND NOT c.attisdropped
+  AND t.relkind IN ('r', 'v');
 
--- SELECT * FROM column_permissions;
-
--- permissions on procedures
 CREATE VIEW function_permissions AS
-	SELECT  'function' AS object_type,
-		rolname AS username,
-	        n.nspname AS object,
-       	 	p.proname AS sub_object,
-        	pg_catalog.pg_get_function_arguments(p.oid) AS sub_sub_object,
-		'EXECUTE' AS permission,
-        	has_function_privilege(rolname, p.oid, 'EXECUTE') AS has_permission
-	FROM 	pg_catalog.pg_proc p
-     		LEFT JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace,
-		LATERAL (SELECT * FROM pg_authid) AS auth
-	WHERE 	n.nspname NOT IN ('pg_catalog', 'information_schema')
-	ORDER BY 1, 2;
+SELECT TEXT 'function' AS object_type,
+       r.rolname AS role_name,
+       f.pronamespace::regnamespace::name AS schema_name,
+       f.oid::regprocedure::text AS object_name,
+       NULL::name AS subobject_name,
+       TEXT 'EXECUTE' AS permission,
+       has_function_privilege(r.oid, f.oid, 'EXECUTE') AS granted
+FROM pg_catalog.pg_proc f
+   CROSS JOIN pg_catalog.pg_roles AS r
+WHERE f.pronamespace::regnamespace::name <> 'information_schema'
+  AND f.pronamespace::regnamespace::name NOT LIKE 'pg_%';
 
--- SELECT * FROM function_permissions;
-
--- schema permissions
 CREATE VIEW schema_permissions AS
-	WITH list AS (SELECT unnest AS perm 
-			FROM unnest ('{"USAGE", "CREATE"}'::text[]))
-	SELECT 	'schema' AS object_type,
-		rolname AS username,
-		n.nspname AS object,
-		NULL::text AS sub_object,
-		NULL::text AS sub_sub_object,
-		perm_list.perm AS permissions,
-		has_schema_privilege(rolname, n.nspname, perm_list.perm) AS has_permission
-	FROM 	pg_catalog.pg_namespace n, pg_authid, list AS perm_list
-	WHERE 	n.nspname !~ '^pg_' 
-		AND n.nspname <> 'information_schema'
-	ORDER BY 1, 2, 3, 4;
+SELECT TEXT 'schema' AS object_type,
+       r.rolname AS role_name,
+       n.nspname AS schema_name,
+       NULL::text AS object_name,
+       NULL::name AS subobject_name,
+       p.perm AS permissions,
+       has_schema_privilege(r.oid, n.oid, p.perm) AS granted
+FROM pg_catalog.pg_namespace AS n
+   CROSS JOIN pg_catalog.pg_roles AS r
+   CROSS JOIN (VALUES ('USAGE'), ('CREATE')) AS p(perm)
+WHERE n.nspname <> 'information_schema'
+  AND n.nspname NOT LIKE 'pg_%';
 
--- SELECT * FROM schema_permissions;
-
--- database permissions
 CREATE VIEW database_permissions AS
-	WITH list AS (SELECT unnest AS perm 
-			FROM unnest ('{"CREATE", "CONNECT", "TEMPORARY"}'::text[]))
-	SELECT 	'database' AS object_type,
-		rolname AS username,
-		datname AS object,
-		NULL::text AS sub_object,
-		NULL::text AS sub_sub_object,
-		perm_list.perm AS permissions,
-		has_database_privilege(rolname, datname, perm_list.perm) AS has_permission
-	FROM 	pg_database, pg_authid, list AS perm_list
-	ORDER BY 1, 2, 3, 4;
+    WITH list AS (SELECT unnest AS perm 
+            FROM unnest ('{"CREATE", "CONNECT", "TEMPORARY"}'::text[]))
+SELECT TEXT 'database' AS object_type,
+    r.rolname AS role_name,
+    NULL::name AS schema_name,
+    NULL::text AS object_name,
+    NULL::name AS subobject_name,
+    p.perm AS permissions,
+    has_database_privilege(r.oid, d.oid, p.perm) AS granted
+FROM pg_catalog.pg_database AS d
+   CROSS JOIN pg_catalog.pg_roles AS r
+   CROSS JOIN (VALUES ('CREATE'), ('CONNECT'), ('TEMPORARY')) AS p(perm)
+WHERE d.datname = current_database();
 
--- SELECT * FROM database_permissions;
-
-CREATE VIEW all_permissions
-AS
-	SELECT	* FROM table_permissions
-	UNION ALL
-	SELECT 	* FROM view_permissions
-	UNION ALL
-	SELECT	* FROM column_permissions
-	UNION ALL
-	SELECT	* FROM function_permissions
-	UNION ALL
-	SELECT	* FROM schema_permissions
-	UNION ALL
-	SELECT	* FROM database_permissions
-;
-
--- SELECT * FROM all_permissions;
-
-COMMIT;
-
+CREATE VIEW all_permissions AS
+SELECT * FROM table_permissions
+UNION ALL
+SELECT * FROM view_permissions
+UNION ALL
+SELECT * FROM column_permissions
+UNION ALL
+SELECT * FROM function_permissions
+UNION ALL
+SELECT * FROM schema_permissions
+UNION ALL
+SELECT * FROM database_permissions;
