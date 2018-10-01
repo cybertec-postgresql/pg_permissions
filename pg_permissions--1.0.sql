@@ -17,7 +17,7 @@ WHERE t.relnamespace::regnamespace::name <> 'information_schema'
   AND t.relkind = 'r';
 
 CREATE VIEW view_permissions AS
-WITH list AS (SELECT unnest AS perm 
+WITH list AS (SELECT unnest AS perm
         FROM unnest ('{"INSERT", "UPDATE", "DELETE", "TRIGGER"}'::text[]))
 SELECT TEXT 'view' AS object_type,
        r.rolname AS role_name,
@@ -78,7 +78,7 @@ WHERE n.nspname <> 'information_schema'
   AND n.nspname NOT LIKE 'pg_%';
 
 CREATE VIEW database_permissions AS
-    WITH list AS (SELECT unnest AS perm 
+    WITH list AS (SELECT unnest AS perm
             FROM unnest ('{"CREATE", "CONNECT", "TEMPORARY"}'::text[]))
 SELECT TEXT 'database' AS object_type,
     r.rolname AS role_name,
