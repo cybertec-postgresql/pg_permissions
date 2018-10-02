@@ -40,7 +40,7 @@ SELECT obj_type 'TABLE' AS object_type,
        has_table_privilege(r.oid, t.oid, p.perm) AS granted
 FROM pg_catalog.pg_class AS t
    CROSS JOIN pg_catalog.pg_roles AS r
-   CROSS JOIN (VALUES (TEXT 'INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) AS p(perm)
+   CROSS JOIN (VALUES (TEXT 'SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) AS p(perm)
 WHERE t.relnamespace::regnamespace::name <> 'information_schema'
   AND t.relnamespace::regnamespace::name NOT LIKE 'pg_%'
   AND t.relkind = 'r'
@@ -58,7 +58,7 @@ SELECT obj_type 'VIEW' AS object_type,
        has_table_privilege(r.oid, t.oid, p.perm) AS granted
 FROM pg_catalog.pg_class AS t
    CROSS JOIN pg_catalog.pg_roles AS r
-   CROSS JOIN (VALUES ('INSERT'), ('UPDATE'), ('DELETE'), ('TRIGGER')) AS p(perm)
+   CROSS JOIN (VALUES (TEXT 'SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) AS p(perm)
 WHERE t.relnamespace::regnamespace::name <> 'information_schema'
   AND t.relnamespace::regnamespace::name NOT LIKE 'pg_%'
   AND t.relkind = 'v'
@@ -77,7 +77,7 @@ SELECT obj_type 'COLUMN' AS object_type,
 FROM pg_catalog.pg_class AS t
    JOIN pg_catalog.pg_attribute AS c ON t.oid = c.attrelid
    CROSS JOIN pg_catalog.pg_roles AS r
-   CROSS JOIN (VALUES ('INSERT'), ('UPDATE'), ('SELECT'), ('REFERENCES')) AS p(perm)
+   CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('REFERENCES')) AS p(perm)
 WHERE t.relnamespace::regnamespace::name <> 'information_schema'
   AND t.relnamespace::regnamespace::name NOT LIKE 'pg_%'
   AND c.attnum > 0 AND NOT c.attisdropped
@@ -182,12 +182,24 @@ CREATE TABLE permission_target (
    schema_name    name,
    object_name    text,
    column_name name,
+   CONSTRAINT permission_target_valid
    CHECK (CASE WHEN object_type = 'DATABASE'
                THEN schema_name IS NULL AND object_name IS NULL AND column_name IS NULL
+                  AND ARRAY['CONNECT','CREATE','TEMPORARY']::perm_type[] @> permissions
                WHEN object_type = 'SCHEMA'
                THEN object_name IS NULL AND column_name IS NULL
-               WHEN object_type IN ('TABLE', 'VIEW', 'SEQUENCE', 'FUNCTION')
+                  AND ARRAY['CREATE','USAGE']::perm_type[] @> permissions
+               WHEN object_type IN ('TABLE', 'VIEW')
                THEN column_name IS NULL
+                  AND ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']::perm_type[] @> permissions
+               WHEN object_type = 'SEQUENCE'
+               THEN column_name IS NULL
+                  AND ARRAY['SELECT','USAGE','UPDATE']::perm_type[] @> permissions
+               WHEN object_type = 'FUNCTION'
+               THEN column_name IS NULL
+                  AND ARRAY['EXECUTE']::perm_type[] @> permissions
+               WHEN object_type = 'COLUMN'
+               THEN ARRAY['SELECT','INSERT','UPDATE','REFERENCES']::perm_type[] @> permissions
           END)
 );
 
