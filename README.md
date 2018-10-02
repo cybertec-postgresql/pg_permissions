@@ -29,9 +29,6 @@ The extension provides a number of views:
 All views have the same columns; a column is NULL if it has no meaning
 for the current view.
 
-The `subobject_name` column only has a meaning in `column_permissions`, where
-it denotes the column name.
-
 These views can be used to examine the currently granted permissions on
 database objects.
 
@@ -44,7 +41,7 @@ The extension provides a table `permission_target` with which you can describe
 the permissions that *should* be granted on database objects.
 
 If you set a relevant column in `permission_target` to NULL (e.g., the
-`object_name` and `subobject_name` columns in a `TABLE` entry), the meaning is
+`object_name` and `column_name` columns in a `TABLE` entry), the meaning is
 that the entry refers to *all* possible objects (in the example above, all
 tables in the schema).
 

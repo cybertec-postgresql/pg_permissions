@@ -35,7 +35,7 @@ SELECT obj_type 'TABLE' AS object_type,
        r.rolname AS role_name,
        t.relnamespace::regnamespace::name AS schema_name,
        t.relname::text AS object_name,
-       NULL::name AS subobject_name,
+       NULL::name AS column_name,
        p.perm::perm_type AS permission,
        has_table_privilege(r.oid, t.oid, p.perm) AS granted
 FROM pg_catalog.pg_class AS t
@@ -53,7 +53,7 @@ SELECT obj_type 'VIEW' AS object_type,
        r.rolname AS role_name,
        t.relnamespace::regnamespace::name AS schema_name,
        t.relname::text AS object_name,
-       NULL::name AS subobject_name,
+       NULL::name AS column_name,
        p.perm::perm_type AS permission,
        has_table_privilege(r.oid, t.oid, p.perm) AS granted
 FROM pg_catalog.pg_class AS t
@@ -71,7 +71,7 @@ SELECT obj_type 'COLUMN' AS object_type,
        r.rolname AS role_name,
        t.relnamespace::regnamespace::name AS schema_name,
        t.relname::text AS object_name,
-       c.attname AS subobject_name,
+       c.attname AS column_name,
        p.perm::perm_type AS permission,
        has_column_privilege(r.oid, t.oid, c.attnum, p.perm) AS granted
 FROM pg_catalog.pg_class AS t
@@ -91,7 +91,7 @@ SELECT obj_type 'SEQUENCE' AS object_type,
        r.rolname AS role_name,
        t.relnamespace::regnamespace::name AS schema_name,
        t.relname::text AS object_name,
-       NULL::name AS subobject_name,
+       NULL::name AS column_name,
        p.perm::perm_type AS permission,
        has_sequence_privilege(r.oid, t.oid, p.perm) AS granted
 FROM pg_catalog.pg_class AS t
@@ -109,7 +109,7 @@ SELECT obj_type 'FUNCTION' AS object_type,
        r.rolname AS role_name,
        f.pronamespace::regnamespace::name AS schema_name,
        f.oid::regprocedure::text AS object_name,
-       NULL::name AS subobject_name,
+       NULL::name AS column_name,
        perm_type 'EXECUTE' AS permission,
        has_function_privilege(r.oid, f.oid, 'EXECUTE') AS granted
 FROM pg_catalog.pg_proc f
@@ -125,7 +125,7 @@ SELECT obj_type 'SCHEMA' AS object_type,
        r.rolname AS role_name,
        n.nspname AS schema_name,
        NULL::text AS object_name,
-       NULL::name AS subobject_name,
+       NULL::name AS column_name,
        p.perm::perm_type AS permissions,
        has_schema_privilege(r.oid, n.oid, p.perm) AS granted
 FROM pg_catalog.pg_namespace AS n
@@ -144,7 +144,7 @@ SELECT obj_type 'DATABASE' AS object_type,
     r.rolname AS role_name,
     NULL::name AS schema_name,
     NULL::text AS object_name,
-    NULL::name AS subobject_name,
+    NULL::name AS column_name,
     p.perm::perm_type AS permissions,
     has_database_privilege(r.oid, d.oid, p.perm) AS granted
 FROM pg_catalog.pg_database AS d
@@ -181,10 +181,17 @@ CREATE TABLE permission_target (
    object_type    obj_type    NOT NULL,
    schema_name    name,
    object_name    text,
-   subobject_name name
+   column_name name,
+   CHECK (CASE WHEN object_type = 'DATABASE'
+               THEN schema_name IS NULL AND object_name IS NULL AND column_name IS NULL
+               WHEN object_type = 'SCHEMA'
+               THEN object_name IS NULL AND column_name IS NULL
+               WHEN object_type IN ('TABLE', 'VIEW', 'SEQUENCE', 'FUNCTION')
+               THEN column_name IS NULL
+          END)
 );
 
-GRANT SELECT ON permission_target TO PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON permission_target TO PUBLIC;
 
 SELECT pg_catalog.pg_extension_config_dump('permission_target', '');
 
@@ -195,7 +202,7 @@ CREATE FUNCTION permission_diffs()
       object_type obj_type,
       schema_name name,
       object_name text,
-      subobject_name name,
+      column_name name,
       permission perm_type
    )
    LANGUAGE plpgsql SET search_path FROM CURRENT STABLE AS
@@ -214,18 +221,18 @@ $$DECLARE
    ag boolean;
 BEGIN
    FOR r, p, typ, s, o, so IN
-      SELECT pt.role_name, p.permission, pt.object_type, pt.schema_name, pt.object_name, pt.subobject_name
+      SELECT pt.role_name, p.permission, pt.object_type, pt.schema_name, pt.object_name, pt.column_name
       FROM permission_target AS pt
          CROSS JOIN LATERAL unnest(pt.permissions) AS p(permission)
    LOOP
       FOR ar, a_s, ao, aso, ag IN
-         SELECT ap.role_name, ap.schema_name, ap.object_name, ap.subobject_name, ap.granted
+         SELECT ap.role_name, ap.schema_name, ap.object_name, ap.column_name, ap.granted
          FROM all_permissions AS ap
          WHERE ap.object_type = typ
            AND ap.permission = p
            AND (ap.schema_name = s OR s IS NULL)
            AND (ap.object_name = o OR o IS NULL)
-           AND (ap.subobject_name = so OR so IS NULL)
+           AND (ap.column_name = so OR so IS NULL)
       LOOP
          IF ar = r AND NOT ag THEN
             /* permission not granted that should be */
@@ -234,7 +241,7 @@ BEGIN
             permission_diffs.object_type := typ;
             permission_diffs.schema_name := a_s;
             permission_diffs.object_name := ao;
-            permission_diffs.subobject_name := aso;
+            permission_diffs.column_name := aso;
             permission_diffs.permission := p;
             RETURN NEXT;
          END IF;
@@ -246,7 +253,7 @@ BEGIN
                       WHERE pt.role_name = ar
                         AND (pt.schema_name IS NULL OR pt.schema_name = a_s)
                         AND (pt.object_name IS NULL OR pt.object_name = ao)
-                        AND (pt.subobject_name IS NULL OR pt.subobject_name = aso)
+                        AND (pt.column_name IS NULL OR pt.column_name = aso)
                    )
             THEN
                /* extra permission found, report */
@@ -255,7 +262,7 @@ BEGIN
                permission_diffs.object_type := typ;
                permission_diffs.schema_name := a_s;
                permission_diffs.object_name := ao;
-               permission_diffs.subobject_name := aso;
+               permission_diffs.column_name := aso;
                permission_diffs.permission := p;
                RETURN NEXT;
             END IF;
