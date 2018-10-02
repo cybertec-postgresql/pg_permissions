@@ -108,7 +108,7 @@ CREATE VIEW function_permissions AS
 SELECT obj_type 'FUNCTION' AS object_type,
        r.rolname AS role_name,
        f.pronamespace::regnamespace::name AS schema_name,
-       f.oid::regprocedure::text AS object_name,
+       regexp_replace(f.oid::regprocedure::text, '^((("[^"]*")|([^"][^.]*))\.)?', '') AS object_name,
        NULL::name AS column_name,
        perm_type 'EXECUTE' AS permission,
        has_function_privilege(r.oid, f.oid, 'EXECUTE') AS granted
@@ -217,7 +217,7 @@ CREATE FUNCTION permission_diffs()
       column_name name,
       permission perm_type
    )
-   LANGUAGE plpgsql SET search_path FROM CURRENT STABLE AS
+   LANGUAGE plpgsql SET search_path FROM CURRENT AS
 $$DECLARE
    typ obj_type;
    r name;
@@ -229,56 +229,63 @@ $$DECLARE
    so name;
    aso name;
    p perm_type;
+   ap perm_type;
    g boolean;
    ag boolean;
 BEGIN
+   /* temporary receptacle for reports */
+   CREATE TEMPORARY TABLE findings (
+      missing boolean,
+      role_name name,
+      object_type obj_type,
+      schema_name name,
+      object_name text,
+      column_name name,
+      permission perm_type
+   ) ON COMMIT DROP;
+
+   /* loop through all entries in "permission_target" */
    FOR r, p, typ, s, o, so IN
       SELECT pt.role_name, p.permission, pt.object_type, pt.schema_name, pt.object_name, pt.column_name
       FROM permission_target AS pt
          CROSS JOIN LATERAL unnest(pt.permissions) AS p(permission)
    LOOP
-      FOR ar, a_s, ao, aso, ag IN
-         SELECT ap.role_name, ap.schema_name, ap.object_name, ap.column_name, ap.granted
-         FROM all_permissions AS ap
-         WHERE ap.object_type = typ
-           AND ap.permission = p
-           AND (ap.schema_name = s OR s IS NULL)
-           AND (ap.object_name = o OR o IS NULL)
-           AND (ap.column_name = so OR so IS NULL)
+      /* find all matching object permissions */
+      FOR ar, ap, a_s, ao, aso, ag IN
+         SELECT apm.role_name, apm.permission, apm.schema_name, apm.object_name, apm.column_name, apm.granted
+         FROM all_permissions AS apm
+         WHERE apm.object_type = typ
+           AND (apm.schema_name = s OR s IS NULL)
+           AND (apm.object_name = o OR o IS NULL)
+           AND (apm.column_name = so OR so IS NULL)
       LOOP
-         IF ar = r AND NOT ag THEN
+         IF ar = r AND ap = p AND NOT ag THEN
             /* permission not granted that should be */
-            permission_diffs.missing := TRUE;
-            permission_diffs.role_name := r;
-            permission_diffs.object_type := typ;
-            permission_diffs.schema_name := a_s;
-            permission_diffs.object_name := ao;
-            permission_diffs.column_name := aso;
-            permission_diffs.permission := p;
-            RETURN NEXT;
+            INSERT INTO findings
+               (missing, role_name, object_type, schema_name, object_name, column_name, permission)
+            VALUES (TRUE, r, typ, a_s, ao, aso, ap);
          END IF;
-         IF ar <> r AND ag THEN
-            /* permission granted to a different role, check if there is a rule */
+         IF (ar <> r OR ap <> p) AND ag THEN
+            /* different permission found, check if there is a matching rule */
             IF NOT EXISTS (
                       SELECT 1
                       FROM permission_target AS pt
                       WHERE pt.role_name = ar
+                        AND pt.permissions @> ARRAY[ap]::perm_type[]
+                        AND pt.object_type = typ
                         AND (pt.schema_name IS NULL OR pt.schema_name = a_s)
                         AND (pt.object_name IS NULL OR pt.object_name = ao)
                         AND (pt.column_name IS NULL OR pt.column_name = aso)
                    )
             THEN
                /* extra permission found, report */
-               permission_diffs.missing := FALSE;
-               permission_diffs.role_name := ar;
-               permission_diffs.object_type := typ;
-               permission_diffs.schema_name := a_s;
-               permission_diffs.object_name := ao;
-               permission_diffs.column_name := aso;
-               permission_diffs.permission := p;
-               RETURN NEXT;
+               INSERT INTO findings
+                  (missing, role_name, object_type, schema_name, object_name, column_name, permission)
+               VALUES (FALSE, ar, typ, a_s, ao, aso, ap);
             END IF;
          END IF;
       END LOOP;
    END LOOP;
+
+   RETURN QUERY SELECT DISTINCT * FROM findings;
 END;$$;
