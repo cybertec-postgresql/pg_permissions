@@ -3,6 +3,39 @@ PostgreSQL permission reports and checks
 
 This extension allows you to review object permissions on a PostgreSQL database.
 
+Cookbook
+--------
+
+First, you have to install the extension in the database:
+
+    CREATE EXTENSION pg_permissions SCHEMA public;
+
+Then you need to add entries to `permission_target` that correspond to your
+desired permissions.
+
+Let's assume we have a schema `appschema`, and `appuser` should have
+`SELECT`, `UPDATE`, `DELETE` and `INSERT` permissions on all tables and
+views in that schema:
+
+    INSERT INTO public.permission_target VALUES
+       (1, 'appuser', '{SELECT,INSERT,UPDATE,DELETE}',
+        'TABLE', 'appschema', NULL, NULL);
+    INSERT INTO public.permission_target VALUES
+       (2, 'appuser', '{SELECT,INSERT,UPDATE,DELETE}',
+        'VIEW', 'appschema', NULL, NULL);
+
+The user also needs `USAGE` privileges on the `appseq` sequence in
+that schema:
+
+    INSERT INTO public.permission_target VALUES
+       (3, 'appuser', '{USAGE}',
+        'SEQUENCE', 'appschema', 'appseq', NULL);
+
+Now we can review which permissions are missing and which additional
+permissions are granted:
+
+    SELECT * FROM public.permission_diffs();
+
 Usage
 -----
 
