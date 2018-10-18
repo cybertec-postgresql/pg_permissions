@@ -162,3 +162,14 @@ subdirectory of that directory, e.g.
     copy pg_permissions.control *.sql "C:\Program Files\PostgreSQL\10\share\extension"
 
 You still have to run `CREATE EXTENSION` as described above.
+
+Support
+-------
+
+Open an [issue][issue] on Gitgub if you have problems or questions.
+
+For professional support, please contact [Cybertec][cybertec].
+
+
+ [issue]: https://github.com/cybertec-postgresql/pg_permission/issues
+ [cybertec]: https://www.cybertec-postgresql.com/
