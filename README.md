@@ -30,19 +30,31 @@ views in that schema:
        (2, 'appuser', '{SELECT,INSERT,UPDATE,DELETE}',
         'VIEW', 'appschema');
 
+Of course, the user will need the `USAGE` privilege on the schema:
+
+    INSERT INTO public.permission_target
+       (id, role_name, permissions,i
+        object_type, schema_name)
+    VALUES
+       (3, 'appuser', '{USAGE}',
+        'SCHEMA', 'appschema');
+
 The user also needs `USAGE` privileges on the `appseq` sequence in
 that schema:
 
-    INSERT INTO public.permission_target VALUES
-       (3, 'appuser', '{USAGE}',
-        'SEQUENCE', 'appschema', 'appseq', NULL);
+    INSERT INTO public.permission_target
+       (id, role_name, permissions,
+        object_type, schema_name, object_name)
+    VALUES
+       (4, 'appuser', '{USAGE}',
+        'SEQUENCE', 'appschema', 'appseq');
 
 Now we can review which permissions are missing and which additional
 permissions are granted:
 
     SELECT * FROM public.permission_diffs();
 
-     missing | role_name | object_type | schema_name | object_name | column_name | permission 
+     missing | role_name | object_type | schema_name | object_name | column_name | permission
     ---------+-----------+-------------+-------------+-------------+-------------+------------
      f       | laurenz   | VIEW        | appschema   | appview     |             | SELECT
      t       | appuser   | TABLE       | appschema   | apptable    |             | DELETE
@@ -52,6 +64,18 @@ That means that `appuser` is missing the `DELETE` privilege on
 `appschema.apptable` which should be granted, while user `laurenz`
 has the additional `SELECT` privilege on `appschema.appview` (`missing`
 is `FALSE`).
+
+To review the actual permissions on an object, we can use the `*_permissions`
+views:
+
+    SELECT * FROM schema_permissions
+       WHERE role_name = 'appuser' AND schema_name = 'appschema';
+
+     object_type | role_name | schema_name | object_name | column_name | permissions | granted
+    -------------+-----------+-------------+-------------+-------------+-------------+---------
+     SCHEMA      | appuser   | appschema   |             |             | USAGE       | t
+     SCHEMA      | appuser   | appschema   |             |             | CREATE      | f
+    (2 rows)
 
 Usage
 -----
