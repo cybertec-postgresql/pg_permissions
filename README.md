@@ -17,12 +17,18 @@ Let's assume we have a schema `appschema`, and `appuser` should have
 `SELECT`, `UPDATE`, `DELETE` and `INSERT` permissions on all tables and
 views in that schema:
 
-    INSERT INTO public.permission_target VALUES
+    INSERT INTO public.permission_target
+       (id, role_name, permissions,
+        object_type, schema_name)
+    VALUES
        (1, 'appuser', '{SELECT,INSERT,UPDATE,DELETE}',
-        'TABLE', 'appschema', NULL, NULL);
-    INSERT INTO public.permission_target VALUES
+        'TABLE', 'appschema');
+    INSERT INTO public.permission_target
+       (id, role_name, permissions,
+        object_type, schema_name)
+    VALUES
        (2, 'appuser', '{SELECT,INSERT,UPDATE,DELETE}',
-        'VIEW', 'appschema', NULL, NULL);
+        'VIEW', 'appschema');
 
 The user also needs `USAGE` privileges on the `appseq` sequence in
 that schema:
@@ -35,6 +41,17 @@ Now we can review which permissions are missing and which additional
 permissions are granted:
 
     SELECT * FROM public.permission_diffs();
+
+     missing | role_name | object_type | schema_name | object_name | column_name | permission 
+    ---------+-----------+-------------+-------------+-------------+-------------+------------
+     f       | laurenz   | VIEW        | appschema   | appview     |             | SELECT
+     t       | appuser   | TABLE       | appschema   | apptable    |             | DELETE
+    (2 rows)
+
+That means that `appuser` is missing the `DELETE` privilege on
+`appschema.apptable` which should be granted, while user `laurenz`
+has the additional `SELECT` privilege on `appschema.appview` (`missing`
+is `FALSE`).
 
 Usage
 -----
