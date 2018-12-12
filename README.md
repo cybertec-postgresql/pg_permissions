@@ -104,7 +104,9 @@ All views have the same columns; a column is NULL if it has no meaning
 for the current view.
 
 These views can be used to examine the currently granted permissions on
-database objects.
+database objects. In addition, the "granted" column of these views can be
+updated. The UPDATE statement causes the appropriate GRANT / REVOKE command to
+be executed.
 
 **Note:** Superusers are not show in the view, as they automatically have
 all permissions.
