@@ -74,7 +74,7 @@ VALUES (13, 'user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'appta
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
 DETAIL:  Failing row contains (13, user2, {DELETE}, COLUMN, appschema, apptable2, val).
 -- actual permissions
-GRANT REFERENCES (val) ON appschema.apptable2 TO user1; -- missing SELECT, INSERT, UPDATE
+-- missing REFERENCES for user1 on apptable2.val
 GRANT UPDATE (val) ON appschema.apptable2 TO user2; -- extra privilege UPDATE
 /* view */
 -- desired permissions
@@ -133,31 +133,7 @@ ORDER BY object_type, role_name, schema_name, object_name, column_name, permissi
  VIEW        | user1     | appschema   | appview         |             | DELETE
  VIEW        | user2     | appschema   | appview         |             | SELECT
  VIEW        | users     | appschema   | appview         |             | SELECT
- COLUMN      | user1     | appschema   | apptable        | created     | SELECT
- COLUMN      | user1     | appschema   | apptable        | created     | INSERT
- COLUMN      | user1     | appschema   | apptable        | created     | UPDATE
- COLUMN      | user1     | appschema   | apptable        | id          | SELECT
- COLUMN      | user1     | appschema   | apptable        | id          | INSERT
- COLUMN      | user1     | appschema   | apptable        | id          | UPDATE
- COLUMN      | user1     | appschema   | apptable        | val         | SELECT
- COLUMN      | user1     | appschema   | apptable        | val         | INSERT
- COLUMN      | user1     | appschema   | apptable        | val         | UPDATE
- COLUMN      | user1     | appschema   | apptable2       | val         | REFERENCES
- COLUMN      | user1     | appschema   | appview         | id          | SELECT
- COLUMN      | user1     | appschema   | appview         | id          | INSERT
- COLUMN      | user1     | appschema   | appview         | val         | SELECT
- COLUMN      | user1     | appschema   | appview         | val         | INSERT
- COLUMN      | user2     | appschema   | apptable        | created     | SELECT
- COLUMN      | user2     | appschema   | apptable        | created     | INSERT
- COLUMN      | user2     | appschema   | apptable        | id          | SELECT
- COLUMN      | user2     | appschema   | apptable        | id          | INSERT
- COLUMN      | user2     | appschema   | apptable        | val         | SELECT
- COLUMN      | user2     | appschema   | apptable        | val         | INSERT
  COLUMN      | user2     | appschema   | apptable2       | val         | UPDATE
- COLUMN      | user2     | appschema   | appview         | id          | SELECT
- COLUMN      | user2     | appschema   | appview         | val         | SELECT
- COLUMN      | users     | appschema   | appview         | id          | SELECT
- COLUMN      | users     | appschema   | appview         | val         | SELECT
  SEQUENCE    | user1     | appschema   | appseq          |             | USAGE
  SEQUENCE    | user2     | appschema   | appseq          |             | UPDATE
  SEQUENCE    | user2     | appschema   | appseq          |             | USAGE
@@ -176,7 +152,7 @@ ORDER BY object_type, role_name, schema_name, object_name, column_name, permissi
  DATABASE    | user2     |             |                 |             | TEMPORARY
  DATABASE    | users     |             |                 |             | CONNECT
  DATABASE    | users     |             |                 |             | TEMPORARY
-(53 rows)
+(29 rows)
 
 /* report differences */
 SELECT * FROM permission_diffs()
@@ -196,6 +172,7 @@ ORDER BY object_type, schema_name, object_name, column_name, role_name, permissi
  t       | user1     | COLUMN      | appschema   | apptable2       | val         | SELECT
  t       | user1     | COLUMN      | appschema   | apptable2       | val         | INSERT
  t       | user1     | COLUMN      | appschema   | apptable2       | val         | UPDATE
+ t       | user1     | COLUMN      | appschema   | apptable2       | val         | REFERENCES
  f       | user2     | COLUMN      | appschema   | apptable2       | val         | UPDATE
  t       | user1     | SEQUENCE    | appschema   | appseq          |             | SELECT
  f       | user2     | SEQUENCE    | appschema   | appseq          |             | UPDATE
@@ -203,7 +180,7 @@ ORDER BY object_type, schema_name, object_name, column_name, role_name, permissi
  t       | user1     | SCHEMA      | appschema   |                 |             | CREATE
  f       | user2     | SCHEMA      | appschema   |                 |             | CREATE
  f       | user2     | DATABASE    |             |                 |             | CREATE
-(19 rows)
+(20 rows)
 
 /* clean up */
 DROP FUNCTION appschema.appfun(integer);
