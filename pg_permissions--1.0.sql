@@ -73,7 +73,8 @@ SELECT obj_type 'COLUMN' AS object_type,
        t.relname::text AS object_name,
        c.attname AS column_name,
        p.perm::perm_type AS permission,
-       has_column_privilege(r.oid, t.oid, c.attnum, p.perm) AS granted
+       has_column_privilege(r.oid, t.oid, c.attnum, p.perm)
+       AND NOT has_table_privilege(r.oid, t.oid, p.perm) AS granted
 FROM pg_catalog.pg_class AS t
    JOIN pg_catalog.pg_attribute AS c ON t.oid = c.attrelid
    CROSS JOIN pg_catalog.pg_roles AS r

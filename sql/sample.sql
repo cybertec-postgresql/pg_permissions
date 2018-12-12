@@ -77,7 +77,7 @@ INSERT INTO permission_target
    (id, role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES (13, 'user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
 -- actual permissions
-GRANT REFERENCES (val) ON appschema.apptable2 TO user1; -- missing SELECT, INSERT, UPDATE
+-- missing REFERENCES for user1 on apptable2.val
 GRANT UPDATE (val) ON appschema.apptable2 TO user2; -- extra privilege UPDATE
 
 /* view */
