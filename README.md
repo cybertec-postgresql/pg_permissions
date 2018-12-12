@@ -132,6 +132,10 @@ be there but isn't; if `missing` is `FALSE`, the result row is a permission that
 is there even though it is not defined in `permission_target` (an extra
 permission).
 
+Function `eliminate_permission_diffs()` tries to eliminate all the differences
+reported by `permission_diffs()`, i.e. it grants permissions reported as
+missing, and revokes those reported as NOT missing.
+
 Installation
 ------------
 

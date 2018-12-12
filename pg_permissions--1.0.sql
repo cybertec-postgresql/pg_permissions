@@ -431,3 +431,20 @@ FOR EACH ROW EXECUTE PROCEDURE permissions_trigger_func();
 CREATE TRIGGER permissions_trigger
 INSTEAD OF UPDATE ON all_permissions
 FOR EACH ROW EXECUTE PROCEDURE permissions_trigger_func();
+
+-- Eliminate all the differences reported by permission_diffs().
+CREATE FUNCTION eliminate_permission_diffs()
+RETURNS void
+LANGUAGE sql
+AS $$
+        UPDATE  all_permissions p
+        SET     granted = d.missing
+        FROM    (SELECT missing, role_name, object_type, schema_name,
+                        object_name, column_name, permission
+                FROM    permission_diffs()) AS d
+        WHERE   (p.role_name, p.object_type, p.schema_name, p.permission) = (d.role_name,
+                d.object_type, d.schema_name, d.permission) AND ((p.object_name
+                = d.object_name) OR (p.object_name ISNULL AND d.object_name
+                ISNULL)) AND ((p.column_name = d.column_name) OR (p.column_name
+                ISNULL AND d.column_name ISNULL))
+$$;
