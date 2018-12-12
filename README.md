@@ -108,8 +108,8 @@ database objects. In addition, the "granted" column of these views can be
 updated. The UPDATE statement causes the appropriate GRANT / REVOKE command to
 be executed.
 
-**Note:** Superusers are not show in the view, as they automatically have
-all permissions.
+**Note:** Superusers are not shown in the view, as they automatically have all
+permissions.
 
 ### Tables ###
 
