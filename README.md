@@ -106,8 +106,8 @@ for the current view.
 These views can be used to examine the currently granted permissions on
 database objects.
 
-**Note:** Superusers are not show in the view, as they automatically have
-all permissions.
+**Note:** Superusers are not shown in the view, as they automatically have all
+permissions.
 
 ### Tables ###
 
