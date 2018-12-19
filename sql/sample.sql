@@ -137,6 +137,30 @@ SELECT * FROM permission_diffs()
 WHERE role_name IN ('users', 'user1', 'user2')
 ORDER BY object_type, schema_name, object_name, column_name, role_name, permission, missing;
 
+/* fix some of the differences */
+
+UPDATE column_permissions SET
+   granted = TRUE
+WHERE role_name = 'user1'
+  AND schema_name = 'appschema'
+  AND object_name = 'apptable2'
+  AND column_name = 'val'
+  AND permission = 'REFERENCES';
+
+UPDATE all_permissions SET
+   granted = FALSE
+WHERE object_type = 'TABLE'
+  AND role_name = 'user2'
+  AND schema_name = 'appschema'
+  AND object_name = 'apptable'
+  AND permission = 'INSERT';
+
+/* check the fixed permissions */
+
+SELECT * FROM permission_diffs()
+WHERE role_name IN ('users', 'user1', 'user2')
+ORDER BY object_type, schema_name, object_name, column_name, role_name, permission, missing;
+
 /* clean up */
 
 DROP FUNCTION appschema.appfun(integer);

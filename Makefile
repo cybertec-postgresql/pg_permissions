@@ -1,5 +1,5 @@
 EXTENSION = pg_permissions
-DATA = pg_permissions--1.0.sql
+DATA = pg_permissions--*.sql
 DOCS = README.pg_permissions
 REGRESS = sample
 

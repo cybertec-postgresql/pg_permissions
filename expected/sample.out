@@ -182,6 +182,47 @@ ORDER BY object_type, schema_name, object_name, column_name, role_name, permissi
  f       | user2     | DATABASE    |             |                 |             | CREATE
 (20 rows)
 
+/* fix some of the differences */
+UPDATE column_permissions SET
+   granted = TRUE
+WHERE role_name = 'user1'
+  AND schema_name = 'appschema'
+  AND object_name = 'apptable2'
+  AND column_name = 'val'
+  AND permission = 'REFERENCES';
+UPDATE all_permissions SET
+   granted = FALSE
+WHERE object_type = 'TABLE'
+  AND role_name = 'user2'
+  AND schema_name = 'appschema'
+  AND object_name = 'apptable'
+  AND permission = 'INSERT';
+/* check the fixed permissions */
+SELECT * FROM permission_diffs()
+WHERE role_name IN ('users', 'user1', 'user2')
+ORDER BY object_type, schema_name, object_name, column_name, role_name, permission, missing;
+ missing | role_name | object_type | schema_name |   object_name   | column_name | permission 
+---------+-----------+-------------+-------------+-----------------+-------------+------------
+ t       | user1     | TABLE       | appschema   | apptable        |             | DELETE
+ t       | user1     | TABLE       | appschema   | apptable2       |             | SELECT
+ t       | user1     | TABLE       | appschema   | apptable2       |             | INSERT
+ t       | user1     | TABLE       | appschema   | apptable2       |             | UPDATE
+ t       | user1     | TABLE       | appschema   | apptable2       |             | DELETE
+ t       | user2     | TABLE       | appschema   | apptable2       |             | SELECT
+ t       | user1     | VIEW        | appschema   | appview         |             | UPDATE
+ f       | users     | VIEW        | appschema   | appview         |             | SELECT
+ t       | user1     | COLUMN      | appschema   | apptable2       | val         | SELECT
+ t       | user1     | COLUMN      | appschema   | apptable2       | val         | INSERT
+ t       | user1     | COLUMN      | appschema   | apptable2       | val         | UPDATE
+ f       | user2     | COLUMN      | appschema   | apptable2       | val         | UPDATE
+ t       | user1     | SEQUENCE    | appschema   | appseq          |             | SELECT
+ f       | user2     | SEQUENCE    | appschema   | appseq          |             | UPDATE
+ f       | users     | FUNCTION    | appschema   | appfun(integer) |             | EXECUTE
+ t       | user1     | SCHEMA      | appschema   |                 |             | CREATE
+ f       | user2     | SCHEMA      | appschema   |                 |             | CREATE
+ f       | user2     | DATABASE    |             |                 |             | CREATE
+(18 rows)
+
 /* clean up */
 DROP FUNCTION appschema.appfun(integer);
 DROP VIEW appschema.appview;

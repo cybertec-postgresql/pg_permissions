@@ -106,7 +106,10 @@ for the current view.
 These views can be used to examine the currently granted permissions on
 database objects.
 
-**Note:** Superusers are not shown in the view, as they automatically have all
+The `granted` column of these views can be updated, which causes the
+appropriate `GRANT` or `REVOKE` command to be executed.
+
+**Note:** Superusers are not shown in the views, as they automatically have all
 permissions.
 
 ### Tables ###
@@ -144,6 +147,10 @@ Make sure that `pg_config` is on your `PATH`.  Then type
 Then connect to the database where you want to run `pg_permissions` and use
 
     CREATE EXTENSION pg_permissions;
+
+To upgrade from an older version of the extension, run
+
+    ALTER EXTENSION pg_permissions UPDATE;
 
 You need `CREATE` privileges on the schema where you install the extension.
 
