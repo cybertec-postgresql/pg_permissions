@@ -1,0 +1,15 @@
+Version 1.1, released 2018-12-19
+
+Enhancements:
+- Add triggers to the permission views to make them updatable.
+  Updating will issue GRANT or REVOKE statements.
+
+  Patch by Antonin Houska.
+
+Bugfixes:
+- Rename the "permissions" column of "schema_permissions" and
+  "database_permissions" to "permission" to match the other views.
+
+Version 1.0, released 2018-10-18
+
+- first release
