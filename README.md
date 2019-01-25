@@ -156,7 +156,7 @@ You need `CREATE` privileges on the schema where you install the extension.
 
 ### Installation without the extension building infrastructure ###
 
-This is also what Windows users will have to dom because there is no extension
+This is also what Windows users will have to do because there is no extension
 building infrastructure for Windows.
 
 Find out where your PostgreSQL share directory is:
@@ -173,7 +173,7 @@ You still have to run `CREATE EXTENSION` as described above.
 Support
 -------
 
-Open an [issue][issue] on Gitgub if you have problems or questions.
+Open an [issue][issue] on GitHub if you have problems or questions.
 
 For professional support, please contact [Cybertec][cybertec].
 
