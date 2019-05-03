@@ -6,14 +6,14 @@ CREATE ROLE user2 LOGIN IN ROLE users;
 /* database */
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (1, 'users', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
-       (2, 'user1', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
-       (3, 'user2', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
+       ('user1', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
+       ('user2', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (4, 'user2', ARRAY['CREATE']::perm_type[], 'DATABASE', 'public', NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['CREATE']::perm_type[], 'DATABASE', 'public', NULL, NULL);
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
 DETAIL:  Failing row contains (4, user2, {CREATE}, DATABASE, public, null, null).
 -- actual permissions
@@ -23,14 +23,14 @@ GRANT CREATE ON DATABASE contrib_regression TO user2; -- too much
 /* schema */
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (5, 'users', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
-       (6, 'user1', ARRAY['USAGE','CREATE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
-       (7, 'user2', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
+       ('user1', ARRAY['USAGE','CREATE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
+       ('user2', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (8, 'user2', ARRAY['CREATE']::perm_type[], 'SCHEMA', 'appschema', 'sometable', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['CREATE']::perm_type[], 'SCHEMA', 'appschema', 'sometable', NULL);
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
 DETAIL:  Failing row contains (8, user2, {CREATE}, SCHEMA, appschema, sometable, null).
 -- actual permissions
@@ -40,13 +40,13 @@ GRANT CREATE ON SCHEMA appschema TO user2; -- too much
 /* table */
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (9,  'user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
-       (10, 'user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
+       ('user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (11, 'user2', ARRAY['INSERT']::perm_type[], 'TABLE', 'appschema', 'apptable', 'acolumn');
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['INSERT']::perm_type[], 'TABLE', 'appschema', 'apptable', 'acolumn');
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
 DETAIL:  Failing row contains (11, user2, {INSERT}, TABLE, appschema, apptable, acolumn).
 -- actual permissions
@@ -65,12 +65,12 @@ GRANT SELECT, INSERT ON appschema.apptable TO user2; -- extra privilege INSERT
 /* column */
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (12, 'user1', ARRAY['SELECT','INSERT','UPDATE','REFERENCES']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','REFERENCES']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (13, 'user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
 DETAIL:  Failing row contains (13, user2, {DELETE}, COLUMN, appschema, apptable2, val).
 -- actual permissions
@@ -79,9 +79,9 @@ GRANT UPDATE (val) ON appschema.apptable2 TO user2; -- extra privilege UPDATE
 /* view */
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (14, 'user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'VIEW', 'appschema', 'appview', NULL),
-       (15, 'user2', ARRAY['SELECT']::perm_type[], 'VIEW', 'appschema', 'appview', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'VIEW', 'appschema', 'appview', NULL),
+       ('user2', ARRAY['SELECT']::perm_type[], 'VIEW', 'appschema', 'appview', NULL);
 -- actual permissions
 CREATE VIEW appschema.appview AS
 SELECT id, val FROM appschema.apptable;
@@ -90,10 +90,10 @@ GRANT INSERT, DELETE ON appschema.appview TO user1; -- missing UPDATE
 /* sequence */
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (16, 'users', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
-       (17, 'user1', ARRAY['USAGE','SELECT']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
-       (18, 'user2', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
+       ('user1', ARRAY['USAGE','SELECT']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
+       ('user2', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL);
 -- actual permissions
 CREATE SEQUENCE appschema.appseq;
 GRANT USAGE ON SEQUENCE appschema.appseq TO users; -- missing SELECT for user1
@@ -101,13 +101,13 @@ GRANT UPDATE ON SEQUENCE appschema.appseq TO user2; -- extra permission UPDATE
 /* function */
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (19, 'user1', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL),
-       (20, 'user2', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL),
+       ('user2', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (21, 'users', ARRAY['UPDATE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['UPDATE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
 DETAIL:  Failing row contains (21, users, {UPDATE}, FUNCTION, appschema, appfun(integer), null).
 -- actual permissions

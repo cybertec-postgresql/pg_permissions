@@ -10,14 +10,14 @@ CREATE ROLE user2 LOGIN IN ROLE users;
 
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (1, 'users', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
-       (2, 'user1', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
-       (3, 'user2', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
+       ('user1', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL),
+       ('user2', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NULL, NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (4, 'user2', ARRAY['CREATE']::perm_type[], 'DATABASE', 'public', NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['CREATE']::perm_type[], 'DATABASE', 'public', NULL, NULL);
 
 -- actual permissions
 REVOKE ALL ON DATABASE contrib_regression FROM PUBLIC;
@@ -28,14 +28,14 @@ GRANT CREATE ON DATABASE contrib_regression TO user2; -- too much
 
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (5, 'users', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
-       (6, 'user1', ARRAY['USAGE','CREATE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
-       (7, 'user2', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
+       ('user1', ARRAY['USAGE','CREATE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL),
+       ('user2', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (8, 'user2', ARRAY['CREATE']::perm_type[], 'SCHEMA', 'appschema', 'sometable', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['CREATE']::perm_type[], 'SCHEMA', 'appschema', 'sometable', NULL);
 -- actual permissions
 CREATE SCHEMA appschema;
 GRANT USAGE ON SCHEMA appschema TO PUBLIC; -- missing CREATE for user1
@@ -45,13 +45,13 @@ GRANT CREATE ON SCHEMA appschema TO user2; -- too much
 
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (9,  'user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
-       (10, 'user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
+       ('user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (11, 'user2', ARRAY['INSERT']::perm_type[], 'TABLE', 'appschema', 'apptable', 'acolumn');
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['INSERT']::perm_type[], 'TABLE', 'appschema', 'apptable', 'acolumn');
 -- actual permissions
 CREATE TABLE appschema.apptable (
    id integer PRIMARY KEY,
@@ -70,12 +70,12 @@ GRANT SELECT, INSERT ON appschema.apptable TO user2; -- extra privilege INSERT
 
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (12, 'user1', ARRAY['SELECT','INSERT','UPDATE','REFERENCES']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','REFERENCES']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (13, 'user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
 -- actual permissions
 -- missing REFERENCES for user1 on apptable2.val
 GRANT UPDATE (val) ON appschema.apptable2 TO user2; -- extra privilege UPDATE
@@ -84,9 +84,9 @@ GRANT UPDATE (val) ON appschema.apptable2 TO user2; -- extra privilege UPDATE
 
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (14, 'user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'VIEW', 'appschema', 'appview', NULL),
-       (15, 'user2', ARRAY['SELECT']::perm_type[], 'VIEW', 'appschema', 'appview', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'VIEW', 'appschema', 'appview', NULL),
+       ('user2', ARRAY['SELECT']::perm_type[], 'VIEW', 'appschema', 'appview', NULL);
 -- actual permissions
 CREATE VIEW appschema.appview AS
 SELECT id, val FROM appschema.apptable;
@@ -97,10 +97,10 @@ GRANT INSERT, DELETE ON appschema.appview TO user1; -- missing UPDATE
 
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (16, 'users', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
-       (17, 'user1', ARRAY['USAGE','SELECT']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
-       (18, 'user2', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
+       ('user1', ARRAY['USAGE','SELECT']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL),
+       ('user2', ARRAY['USAGE']::perm_type[], 'SEQUENCE', 'appschema', 'appseq', NULL);
 -- actual permissions
 CREATE SEQUENCE appschema.appseq;
 GRANT USAGE ON SEQUENCE appschema.appseq TO users; -- missing SELECT for user1
@@ -110,13 +110,13 @@ GRANT UPDATE ON SEQUENCE appschema.appseq TO user2; -- extra permission UPDATE
 
 -- desired permissions
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (19, 'user1', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL),
-       (20, 'user2', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL),
+       ('user2', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
 -- this should fail
 INSERT INTO permission_target
-   (id, role_name, permissions, object_type, schema_name, object_name, column_name)
-VALUES (21, 'users', ARRAY['UPDATE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('users', ARRAY['UPDATE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
 -- actual permissions
 CREATE FUNCTION appschema.appfun(i integer) RETURNS integer
    LANGUAGE sql IMMUTABLE AS

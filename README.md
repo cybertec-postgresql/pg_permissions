@@ -18,35 +18,35 @@ Let's assume we have a schema `appschema`, and `appuser` should have
 views in that schema:
 
     INSERT INTO public.permission_target
-       (id, role_name, permissions,
+       (role_name, permissions,
         object_type, schema_name)
     VALUES
-       (1, 'appuser', '{SELECT,INSERT,UPDATE,DELETE}',
+       ('appuser', '{SELECT,INSERT,UPDATE,DELETE}',
         'TABLE', 'appschema');
     INSERT INTO public.permission_target
-       (id, role_name, permissions,
+       (role_name, permissions,
         object_type, schema_name)
     VALUES
-       (2, 'appuser', '{SELECT,INSERT,UPDATE,DELETE}',
+       ('appuser', '{SELECT,INSERT,UPDATE,DELETE}',
         'VIEW', 'appschema');
 
 Of course, the user will need the `USAGE` privilege on the schema:
 
     INSERT INTO public.permission_target
-       (id, role_name, permissions,i
+       (role_name, permissions,i
         object_type, schema_name)
     VALUES
-       (3, 'appuser', '{USAGE}',
+       ('appuser', '{USAGE}',
         'SCHEMA', 'appschema');
 
 The user also needs `USAGE` privileges on the `appseq` sequence in
 that schema:
 
     INSERT INTO public.permission_target
-       (id, role_name, permissions,
+       (role_name, permissions,
         object_type, schema_name, object_name)
     VALUES
-       (4, 'appuser', '{USAGE}',
+       ('appuser', '{USAGE}',
         'SEQUENCE', 'appschema', 'appseq');
 
 Now we can review which permissions are missing and which additional

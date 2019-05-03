@@ -1,4 +1,4 @@
 comment = 'view object permissions and compare them with the desired state'
-default_version = '1.1'
+default_version = '1.2'
 relocatable = false
 superuser = false
