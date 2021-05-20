@@ -33,7 +33,7 @@ views in that schema:
 Of course, the user will need the `USAGE` privilege on the schema:
 
     INSERT INTO public.permission_target
-       (role_name, permissions,i
+       (role_name, permissions,
         object_type, schema_name)
     VALUES
        ('appuser', '{USAGE}',
