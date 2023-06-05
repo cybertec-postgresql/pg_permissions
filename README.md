@@ -175,7 +175,8 @@ Support
 
 Open an [issue][issue] on GitHub if you have problems or questions.
 
-For professional support, please contact [Cybertec][cybertec].
+For professional support, please contact
+[CYBERTEC PostgreSQL International GmbH][cybertec].
 
 
  [issue]: https://github.com/cybertec-postgresql/pg_permissions/issues
