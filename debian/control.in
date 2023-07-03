@@ -18,6 +18,5 @@ Architecture: any
 Depends:
  ${misc:Depends},
  ${postgresql:Depends},
- ${shlibs:Depends},
 Description: Review object permissions on a PostgreSQL database.
  Review object permissions on a PostgreSQL database.
