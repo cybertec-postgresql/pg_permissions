@@ -1,0 +1,23 @@
+Source: pg-permissions
+Section: database
+Priority: optional
+Maintainer: CYBERTEC PostgreSQL <office@cybertec.at>
+Uploaders:
+ Christoph Berg <myon@debian.org>,
+Build-Depends:
+ debhelper-compat (= 13),
+ postgresql-all (>= 217~),
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Homepage: https://www.cybertec-postgresql.com/en/
+Vcs-Browser: https://github.com/cybertec-postgresql/pg_squeeze
+Vcs-Git: https://github.com/cybertec-postgresql/pg_squeeze.git
+
+Package: postgresql-15-permissions
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${postgresql:Depends},
+ ${shlibs:Depends},
+Description: Review object permissions on a PostgreSQL database.
+ Review object permissions on a PostgreSQL database.
