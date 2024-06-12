@@ -154,6 +154,13 @@ To upgrade from an older version of the extension, run
 
 You need `CREATE` privileges on the schema where you install the extension.
 
+Note that you won't be able to upgrade the extension from version 1.2 or
+earlier to 1.3 or later for technical reasons (an added enumeration value for
+the `MAINTAIN` privilege).  You will have to drop and re-create the extension
+to upgrade to 1.3 or later from an earlier release.  Don't forget to dump
+the contents of `permission_target` before you do that, so that you can restore
+them afterwards.
+
 ### Installation without the extension building infrastructure ###
 
 This is also what Windows users will have to do because there is no extension
