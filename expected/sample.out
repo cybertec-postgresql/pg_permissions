@@ -37,18 +37,21 @@ DETAIL:  Failing row contains (8, user2, {CREATE}, SCHEMA, appschema, sometable,
 CREATE SCHEMA appschema;
 GRANT USAGE ON SCHEMA appschema TO PUBLIC; -- missing CREATE for user1
 GRANT CREATE ON SCHEMA appschema TO user2; -- too much
+CREATE SCHEMA pgabc123;
+GRANT USAGE ON SCHEMA pgabc123 TO user1;
 /* table */
 -- desired permissions
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
-       ('user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL);
+       ('user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
+       ('user1', ARRAY['SELECT']::perm_type[], 'TABLE', 'pgabc213', 'sometable', NULL);
 -- this should fail
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user2', ARRAY['INSERT']::perm_type[], 'TABLE', 'appschema', 'apptable', 'acolumn');
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (11, user2, {INSERT}, TABLE, appschema, apptable, acolumn).
+DETAIL:  Failing row contains (12, user2, {INSERT}, TABLE, appschema, apptable, acolumn).
 -- actual permissions
 CREATE TABLE appschema.apptable (
    id integer PRIMARY KEY,
@@ -60,8 +63,14 @@ CREATE TABLE appschema.apptable2 (
    val text NOT NULL,
    created timestamp with time zone NOT NULL DEFAULT current_timestamp
 ); -- missing all permissions on this one
+CREATE TABLE pgabc123.sometable (
+   id integer PRIMARY KEY,
+   val text NOT NULL,
+   created timestamp with time zone NOT NULL DEFAULT current_timestamp
+);
 GRANT SELECT, INSERT, UPDATE ON appschema.apptable TO user1; -- missing DELETE
 GRANT SELECT, INSERT ON appschema.apptable TO user2; -- extra privilege INSERT
+GRANT SELECT ON pgabc123.sometable TO user1;
 /* column */
 -- desired permissions
 INSERT INTO permission_target
@@ -72,7 +81,7 @@ INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (13, user2, {DELETE}, COLUMN, appschema, apptable2, val).
+DETAIL:  Failing row contains (14, user2, {DELETE}, COLUMN, appschema, apptable2, val).
 -- actual permissions
 -- missing REFERENCES for user1 on apptable2.val
 GRANT UPDATE (val) ON appschema.apptable2 TO user2; -- extra privilege UPDATE
@@ -109,7 +118,7 @@ INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('users', ARRAY['UPDATE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
 ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (21, users, {UPDATE}, FUNCTION, appschema, appfun(integer), null).
+DETAIL:  Failing row contains (22, users, {UPDATE}, FUNCTION, appschema, appfun(integer), null).
 -- actual permissions
 CREATE FUNCTION appschema.appfun(i integer) RETURNS integer
    LANGUAGE sql IMMUTABLE AS
@@ -119,13 +128,14 @@ SELECT object_type, role_name, schema_name, object_name, column_name, permission
 FROM all_permissions
 WHERE granted
   AND role_name IN ('users', 'user1', 'user2')
-  AND coalesce(schema_name, 'appschema') = 'appschema'
+  AND coalesce(schema_name, 'appschema') IN ('appschema', 'pgabc123')
 ORDER BY object_type, role_name, schema_name, object_name, column_name, permission;
  object_type | role_name | schema_name |   object_name   | column_name | permission 
 -------------+-----------+-------------+-----------------+-------------+------------
  TABLE       | user1     | appschema   | apptable        |             | SELECT
  TABLE       | user1     | appschema   | apptable        |             | INSERT
  TABLE       | user1     | appschema   | apptable        |             | UPDATE
+ TABLE       | user1     | pgabc123    | sometable       |             | SELECT
  TABLE       | user2     | appschema   | apptable        |             | SELECT
  TABLE       | user2     | appschema   | apptable        |             | INSERT
  VIEW        | user1     | appschema   | appview         |             | SELECT
@@ -142,6 +152,7 @@ ORDER BY object_type, role_name, schema_name, object_name, column_name, permissi
  FUNCTION    | user2     | appschema   | appfun(integer) |             | EXECUTE
  FUNCTION    | users     | appschema   | appfun(integer) |             | EXECUTE
  SCHEMA      | user1     | appschema   |                 |             | USAGE
+ SCHEMA      | user1     | pgabc123    |                 |             | USAGE
  SCHEMA      | user2     | appschema   |                 |             | USAGE
  SCHEMA      | user2     | appschema   |                 |             | CREATE
  SCHEMA      | users     | appschema   |                 |             | USAGE
@@ -152,7 +163,7 @@ ORDER BY object_type, role_name, schema_name, object_name, column_name, permissi
  DATABASE    | user2     |             |                 |             | TEMPORARY
  DATABASE    | users     |             |                 |             | CONNECT
  DATABASE    | users     |             |                 |             | TEMPORARY
-(29 rows)
+(31 rows)
 
 /* report differences */
 SELECT * FROM permission_diffs()
@@ -229,7 +240,9 @@ DROP VIEW appschema.appview;
 DROP SEQUENCE appschema.appseq;
 DROP TABLE appschema.apptable;
 DROP TABLE appschema.apptable2;
+DROP TABLE pgabc123.sometable;
 DROP SCHEMA appschema;
+DROP SCHEMA pgabc123;
 REVOKE ALL ON DATABASE contrib_regression FROM user1, user2, users;
 DROP ROLE user1;
 DROP ROLE user2;

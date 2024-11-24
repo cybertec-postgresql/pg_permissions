@@ -40,6 +40,8 @@ VALUES ('user2', ARRAY['CREATE']::perm_type[], 'SCHEMA', 'appschema', 'sometable
 CREATE SCHEMA appschema;
 GRANT USAGE ON SCHEMA appschema TO PUBLIC; -- missing CREATE for user1
 GRANT CREATE ON SCHEMA appschema TO user2; -- too much
+CREATE SCHEMA pgabc123;
+GRANT USAGE ON SCHEMA pgabc123 TO user1;
 
 /* table */
 
@@ -47,7 +49,8 @@ GRANT CREATE ON SCHEMA appschema TO user2; -- too much
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
-       ('user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL);
+       ('user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
+       ('user1', ARRAY['SELECT']::perm_type[], 'TABLE', 'pgabc213', 'sometable', NULL);
 -- this should fail
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
@@ -63,8 +66,14 @@ CREATE TABLE appschema.apptable2 (
    val text NOT NULL,
    created timestamp with time zone NOT NULL DEFAULT current_timestamp
 ); -- missing all permissions on this one
+CREATE TABLE pgabc123.sometable (
+   id integer PRIMARY KEY,
+   val text NOT NULL,
+   created timestamp with time zone NOT NULL DEFAULT current_timestamp
+);
 GRANT SELECT, INSERT, UPDATE ON appschema.apptable TO user1; -- missing DELETE
 GRANT SELECT, INSERT ON appschema.apptable TO user2; -- extra privilege INSERT
+GRANT SELECT ON pgabc123.sometable TO user1;
 
 /* column */
 
@@ -128,7 +137,7 @@ SELECT object_type, role_name, schema_name, object_name, column_name, permission
 FROM all_permissions
 WHERE granted
   AND role_name IN ('users', 'user1', 'user2')
-  AND coalesce(schema_name, 'appschema') = 'appschema'
+  AND coalesce(schema_name, 'appschema') IN ('appschema', 'pgabc123')
 ORDER BY object_type, role_name, schema_name, object_name, column_name, permission;
 
 /* report differences */
@@ -168,7 +177,9 @@ DROP VIEW appschema.appview;
 DROP SEQUENCE appschema.appseq;
 DROP TABLE appschema.apptable;
 DROP TABLE appschema.apptable2;
+DROP TABLE pgabc123.sometable;
 DROP SCHEMA appschema;
+DROP SCHEMA pgabc123;
 REVOKE ALL ON DATABASE contrib_regression FROM user1, user2, users;
 
 DROP ROLE user1;
