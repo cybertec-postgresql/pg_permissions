@@ -1,4 +1,17 @@
-Version 1.4, not yet released
+Version 1.4.1, released 2026-06-29
+
+Enhancements:
+- test/: a Dockerfile parameterised by PG_MAJOR plus run-tests.sh and
+  run-installcheck.sh to build and run "make installcheck" against every
+  supported major version in throwaway containers.  Not-yet-released
+  versions (currently 19) are pulled from the pgdg-snapshot repository.
+- CI: add PostgreSQL 19 to the regression matrix.
+- README: document all of the *_permissions views with worked examples,
+  add a desired-vs-actual walkthrough built around permission_diffs() and
+  the updatable views, and add a Compliance section relating the extension
+  to common regulatory frameworks.
+
+Version 1.4, released 2025-08-04
 
 Bugfixes:
 - Match a literal underscore in the "pg\_%" LIKE pattern so that schemas
