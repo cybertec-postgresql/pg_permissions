@@ -71,10 +71,10 @@ views:
     SELECT * FROM schema_permissions
        WHERE role_name = 'appuser' AND schema_name = 'appschema';
 
-     object_type | role_name | schema_name | object_name | column_name | permissions | granted
-    -------------+-----------+-------------+-------------+-------------+-------------+---------
-     SCHEMA      | appuser   | appschema   |             |             | USAGE       | t
-     SCHEMA      | appuser   | appschema   |             |             | CREATE      | f
+     object_type | role_name | schema_name | object_name | column_name | permission | granted
+    -------------+-----------+-------------+-------------+-------------+------------+---------
+     SCHEMA      | appuser   | appschema   |             |             | USAGE      | t
+     SCHEMA      | appuser   | appschema   |             |             | CREATE     | f
     (2 rows)
 
 Usage
@@ -112,6 +112,12 @@ All views share the same columns:
 A column is NULL if it has no meaning for the current view; for example,
 `column_name` is only set in `column_permissions`, and `schema_name` is
 always NULL in `database_permissions`.
+
+`table_permissions` contains regular, partitioned and foreign tables (all
+labeled `TABLE`), `view_permissions` contains views and materialized views
+(both labeled `VIEW`), and `function_permissions` contains functions,
+aggregates, window functions and procedures (all labeled `FUNCTION`).
+Toast tables and the system catalogs are not covered.
 
 These views can be used to examine the currently granted permissions on
 database objects.
@@ -324,6 +330,12 @@ be there but isn't; if `missing` is `FALSE`, the result row is a permission that
 is there even though it is not defined in `permission_target` (an extra
 permission).
 
+**Note:** extra permissions are only searched for on objects that are
+covered by at least one entry in `permission_target`: the audit checks the
+scope described by the desired state, not the whole cluster.  Privileges on
+objects that no target entry mentions are neither reported as missing nor
+as extra.
+
 #### Comparing desired and actual state ####
 
 Suppose `appuser` should be able to read and write all tables in `appschema`,
@@ -408,7 +420,7 @@ Find out where your PostgreSQL share directory is:
 Then copy `pg_permissions.control` and the SQL files to the `extension`
 subdirectory of that directory, e.g.
 
-    copy pg_permissions.control *.sql "C:\Program Files\PostgreSQL\10\share\extension"
+    copy pg_permissions.control *.sql "C:\Program Files\PostgreSQL\18\share\extension"
 
 You still have to run `CREATE EXTENSION` as described above.
 

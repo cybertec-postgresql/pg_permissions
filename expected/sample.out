@@ -45,7 +45,7 @@ INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
        ('user2', ARRAY['SELECT']::perm_type[], 'TABLE', 'appschema', NULL, NULL),
-       ('user1', ARRAY['SELECT']::perm_type[], 'TABLE', 'pgabc213', 'sometable', NULL);
+       ('user1', ARRAY['SELECT']::perm_type[], 'TABLE', 'pgabc123', 'sometable', NULL);
 -- this should fail
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
@@ -234,6 +234,95 @@ ORDER BY object_type, schema_name, object_name, column_name, role_name, permissi
  f       | user2     | DATABASE    |             |                 |             | CREATE
 (18 rows)
 
+/* regression tests for the bugs fixed in 1.5 */
+/* the objects of this section live in their own schema so that they do
+   not match any entry of "permission_target" */
+CREATE SCHEMA fixschema;
+-- identifiers that need quoting used to break the generated GRANT
+CREATE ROLE "MiXeD" LOGIN;
+CREATE TABLE fixschema."Weird Name"(a integer);
+UPDATE table_permissions SET granted = TRUE
+ WHERE role_name = 'MiXeD' AND schema_name = 'fixschema'
+   AND object_name = 'Weird Name' AND permission = 'SELECT';
+SELECT has_table_privilege('MiXeD', 'fixschema."Weird Name"', 'SELECT')
+   AS quoted_grant_works;
+ quoted_grant_works 
+--------------------
+ t
+(1 row)
+
+-- procedures appear in "function_permissions" and used to fail the
+-- "GRANT ... ON FUNCTION" issued by the trigger
+CREATE PROCEDURE fixschema.appproc() LANGUAGE sql AS 'SELECT 1';
+REVOKE EXECUTE ON PROCEDURE fixschema.appproc() FROM PUBLIC;
+UPDATE function_permissions SET granted = TRUE
+ WHERE role_name = 'user1' AND schema_name = 'fixschema'
+   AND object_name = 'appproc()';
+SELECT has_function_privilege('user1', 'fixschema.appproc()', 'EXECUTE')
+   AS procedure_grant_works;
+ procedure_grant_works 
+-----------------------
+ t
+(1 row)
+
+-- key columns that are NULL must still be protected from updates
+UPDATE database_permissions SET granted = TRUE, object_name = 'otherdb'
+ WHERE role_name = 'user1' AND permission = 'CONNECT';
+ERROR:  Only the "granted" column may be updated
+CONTEXT:  PL/pgSQL function permissions_trigger_func() line 16 at RAISE
+-- partitioned tables and materialized views are covered by the views
+CREATE TABLE fixschema.part(a integer) PARTITION BY RANGE(a);
+CREATE MATERIALIZED VIEW fixschema.mv AS SELECT 1 AS a;
+SELECT count(*) > 0 AS partitioned_table_visible
+   FROM table_permissions
+ WHERE schema_name = 'fixschema' AND object_name = 'part';
+ partitioned_table_visible 
+---------------------------
+ t
+(1 row)
+
+SELECT count(*) > 0 AS matview_visible
+   FROM view_permissions
+ WHERE schema_name = 'fixschema' AND object_name = 'mv';
+ matview_visible 
+-----------------
+ t
+(1 row)
+
+-- a column privilege held at the table level is not reported missing
+CREATE TABLE fixschema.t1(a integer);
+REVOKE ALL ON fixschema.t1 FROM PUBLIC;
+GRANT SELECT ON fixschema.t1 TO user1;
+INSERT INTO permission_target
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('user1', ARRAY['SELECT']::perm_type[], 'COLUMN', 'fixschema', 't1', 'a');
+SELECT count(*) AS column_false_positives FROM permission_diffs()
+ WHERE role_name = 'user1' AND object_type = 'COLUMN'
+   AND schema_name = 'fixschema';
+ column_false_positives 
+------------------------
+                      0
+(1 row)
+
+DELETE FROM permission_target
+ WHERE object_type = 'COLUMN' AND schema_name = 'fixschema';
+-- permission_diffs() used to fail when called twice in one transaction
+SELECT count(*) AS first_call FROM permission_diffs()
+ WHERE role_name IN ('users', 'user1', 'user2');
+ first_call 
+------------
+         18
+(1 row)
+
+SELECT count(*) AS second_call FROM permission_diffs()
+ WHERE role_name IN ('users', 'user1', 'user2');
+ second_call 
+-------------
+          18
+(1 row)
+
+COMMIT;
+WARNING:  there is no transaction in progress
 /* clean up */
 DROP FUNCTION appschema.appfun(integer);
 DROP VIEW appschema.appview;
@@ -243,7 +332,14 @@ DROP TABLE appschema.apptable2;
 DROP TABLE pgabc123.sometable;
 DROP SCHEMA appschema;
 DROP SCHEMA pgabc123;
+DROP MATERIALIZED VIEW fixschema.mv;
+DROP TABLE fixschema.part;
+DROP TABLE fixschema."Weird Name";
+DROP TABLE fixschema.t1;
+DROP PROCEDURE fixschema.appproc();
+DROP SCHEMA fixschema;
 REVOKE ALL ON DATABASE contrib_regression FROM user1, user2, users;
 DROP ROLE user1;
 DROP ROLE user2;
 DROP ROLE users;
+DROP ROLE "MiXeD";
