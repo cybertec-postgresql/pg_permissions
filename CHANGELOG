@@ -1,3 +1,27 @@
+Version 1.5, released 2026-09-19
+
+Bugfixes:
+- The "Only the granted column may be updated" guard in the updatable
+  views used plain inequality, so a key column that is NULL (such as
+  "object_name" of a database or schema row) could be changed unnoticed.
+  The comparison now uses "IS DISTINCT FROM".
+- The GRANT and REVOKE statements issued by the updatable views now quote
+  all identifiers; names that need quoting no longer cause a syntax error
+  or silently address the wrong object.
+- Updating a row of "function_permissions" that corresponds to a
+  procedure failed because "GRANT ... ON FUNCTION" does not work for
+  procedures.  The trigger now uses "ROUTINE", which covers functions,
+  aggregates, window functions and procedures alike.
+- "permission_diffs()" no longer uses a temporary table, so it can be
+  called more than once in a single transaction.
+- A column privilege that is held at the table level is no longer
+  reported as missing by "permission_diffs()", and a table or view level
+  target now covers privileges on its columns.
+- Partitioned tables and foreign tables are now contained in
+  "table_permissions", materialized views in "view_permissions", and
+  "column_permissions" covers all of these object types.
+- Remove a dead common table expression from "database_permissions".
+
 Version 1.4.1, released 2026-06-29
 
 Enhancements:
