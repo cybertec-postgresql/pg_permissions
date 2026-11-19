@@ -1,3 +1,7 @@
+-- Keep the expected output stable: DETAIL and CONTEXT lines contain
+-- sequence values and PL/pgSQL line numbers.
+\set VERBOSITY terse
+
 CREATE EXTENSION pg_permissions;
 
 /* test roles (will be removed afterwards) */

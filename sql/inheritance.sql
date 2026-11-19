@@ -1,0 +1,36 @@
+-- A privilege that a role holds through role membership must not be reported
+-- as a surplus grant, but a direct grant to a member must be.
+\set VERBOSITY terse
+
+DROP EXTENSION pg_permissions CASCADE;
+CREATE EXTENSION pg_permissions;
+
+CREATE ROLE inh_parent;
+CREATE ROLE inh_child IN ROLE inh_parent;
+CREATE TABLE inh_t(a int);
+
+GRANT SELECT ON inh_t TO inh_parent;
+INSERT INTO permission_target
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('inh_parent', ARRAY['SELECT']::perm_type[], 'TABLE', 'public', 'inh_t', NULL);
+
+-- the child inherits SELECT; that is not a surplus grant
+SELECT * FROM permission_diffs()
+WHERE role_name IN ('inh_parent', 'inh_child')
+ORDER BY missing, role_name, permission;
+
+-- a direct grant to the child is a surplus grant
+GRANT INSERT ON inh_t TO inh_child;
+SELECT * FROM permission_diffs()
+WHERE role_name IN ('inh_parent', 'inh_child')
+ORDER BY missing, role_name, permission;
+
+-- a missing privilege is still reported for the parent
+REVOKE SELECT ON inh_t FROM inh_parent;
+SELECT * FROM permission_diffs()
+WHERE role_name IN ('inh_parent', 'inh_child')
+ORDER BY missing, role_name, permission;
+
+DROP TABLE inh_t;
+DROP ROLE inh_child;
+DROP ROLE inh_parent;
