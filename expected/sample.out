@@ -1,3 +1,6 @@
+-- Keep the expected output stable: DETAIL and CONTEXT lines contain
+-- sequence values and PL/pgSQL line numbers.
+\set VERBOSITY terse
 CREATE EXTENSION pg_permissions;
 /* test roles (will be removed afterwards) */
 CREATE ROLE users;
@@ -14,8 +17,7 @@ VALUES ('users', ARRAY['CONNECT','TEMPORARY']::perm_type[], 'DATABASE', NULL, NU
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user2', ARRAY['CREATE']::perm_type[], 'DATABASE', 'public', NULL, NULL);
-ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (4, user2, {CREATE}, DATABASE, public, null, null).
+ERROR:  a DATABASE target must not set schema_name, object_name or column_name
 -- actual permissions
 REVOKE ALL ON DATABASE contrib_regression FROM PUBLIC;
 GRANT CONNECT, TEMPORARY ON DATABASE contrib_regression TO users;
@@ -31,8 +33,7 @@ VALUES ('users', ARRAY['USAGE']::perm_type[], 'SCHEMA', 'appschema', NULL, NULL)
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user2', ARRAY['CREATE']::perm_type[], 'SCHEMA', 'appschema', 'sometable', NULL);
-ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (8, user2, {CREATE}, SCHEMA, appschema, sometable, null).
+ERROR:  a SCHEMA target must not set object_name or column_name
 -- actual permissions
 CREATE SCHEMA appschema;
 GRANT USAGE ON SCHEMA appschema TO PUBLIC; -- missing CREATE for user1
@@ -50,8 +51,7 @@ VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','DELETE']::perm_type[], 'TABLE
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user2', ARRAY['INSERT']::perm_type[], 'TABLE', 'appschema', 'apptable', 'acolumn');
-ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (12, user2, {INSERT}, TABLE, appschema, apptable, acolumn).
+ERROR:  a TABLE target must not set column_name
 -- actual permissions
 CREATE TABLE appschema.apptable (
    id integer PRIMARY KEY,
@@ -80,8 +80,7 @@ VALUES ('user1', ARRAY['SELECT','INSERT','UPDATE','REFERENCES']::perm_type[], 'C
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('user2', ARRAY['DELETE']::perm_type[], 'COLUMN', 'appschema', 'apptable2', 'val');
-ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (14, user2, {DELETE}, COLUMN, appschema, apptable2, val).
+ERROR:  invalid permission for a COLUMN target: {DELETE}
 -- actual permissions
 -- missing REFERENCES for user1 on apptable2.val
 GRANT UPDATE (val) ON appschema.apptable2 TO user2; -- extra privilege UPDATE
@@ -117,8 +116,7 @@ VALUES ('user1', ARRAY['EXECUTE']::perm_type[], 'FUNCTION', 'appschema', 'appfun
 INSERT INTO permission_target
    (role_name, permissions, object_type, schema_name, object_name, column_name)
 VALUES ('users', ARRAY['UPDATE']::perm_type[], 'FUNCTION', 'appschema', 'appfun(integer)', NULL);
-ERROR:  new row for relation "permission_target" violates check constraint "permission_target_valid"
-DETAIL:  Failing row contains (22, users, {UPDATE}, FUNCTION, appschema, appfun(integer), null).
+ERROR:  invalid permission for a FUNCTION target: {UPDATE}
 -- actual permissions
 CREATE FUNCTION appschema.appfun(i integer) RETURNS integer
    LANGUAGE sql IMMUTABLE AS
@@ -269,7 +267,6 @@ SELECT has_function_privilege('user1', 'fixschema.appproc()', 'EXECUTE')
 UPDATE database_permissions SET granted = TRUE, object_name = 'otherdb'
  WHERE role_name = 'user1' AND permission = 'CONNECT';
 ERROR:  Only the "granted" column may be updated
-CONTEXT:  PL/pgSQL function permissions_trigger_func() line 16 at RAISE
 -- partitioned tables and materialized views are covered by the views
 CREATE TABLE fixschema.part(a integer) PARTITION BY RANGE(a);
 CREATE MATERIALIZED VIEW fixschema.mv AS SELECT 1 AS a;

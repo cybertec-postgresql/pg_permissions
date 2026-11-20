@@ -13,7 +13,7 @@ Requirements
 Usage
 -----
 
-Run all supported versions (currently 12 through 19) from the repository root:
+Run all supported versions (currently 15 through 19) from the repository root:
 
     test/run-tests.sh
 

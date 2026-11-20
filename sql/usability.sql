@@ -1,0 +1,72 @@
+-- Usability helpers: baseline snapshot, privilege provenance, fix SQL,
+-- dry-run apply and a triage summary.
+\set VERBOSITY terse
+
+DROP EXTENSION pg_permissions CASCADE;
+CREATE EXTENSION pg_permissions;
+
+CREATE ROLE use_owner;
+CREATE ROLE use_direct;
+CREATE ROLE use_parent;
+CREATE ROLE use_child IN ROLE use_parent;
+CREATE TABLE use_t(a int, b int);
+ALTER TABLE use_t OWNER TO use_owner;
+GRANT SELECT ON use_t TO use_direct;
+GRANT INSERT ON use_t TO use_parent;
+GRANT UPDATE ON use_t TO PUBLIC;
+
+-- why does each role hold a privilege?
+SELECT role_name, permission, granted, source
+FROM table_permissions
+WHERE schema_name = 'public' AND object_name = 'use_t'
+  AND role_name IN ('use_owner', 'use_direct', 'use_parent', 'use_child', 'PUBLIC')
+  AND permission IN ('SELECT', 'INSERT', 'UPDATE')
+ORDER BY role_name, permission;
+
+-- adopt the current state as the baseline
+SELECT permission_target_snapshot('use_direct') AS inserted;
+SELECT role_name, permissions, object_type, schema_name, object_name
+FROM permission_target
+ORDER BY object_type, schema_name, object_name;
+
+-- running it again inserts nothing
+SELECT permission_target_snapshot('use_direct') AS inserted_again;
+
+-- the snapshot does not baseline the extension's own objects, even though
+-- PUBLIC can read them
+TRUNCATE permission_target;
+SELECT permission_target_snapshot('use_direct') > 0 AS inserted_something;
+SELECT count(*) AS extension_objects
+FROM permission_target
+WHERE object_name IN ('permission_target', 'default_acl_target',
+                      'table_permissions', 'all_permissions');
+
+-- one target row, one summary row
+TRUNCATE permission_target;
+INSERT INTO permission_target
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('use_direct', ARRAY['SELECT','INSERT','UPDATE']::perm_type[],
+        'TABLE', 'public', 'use_t', NULL);
+SELECT * FROM permission_diff_summary ORDER BY role_name, permission;
+
+-- the statements that would fix it
+SELECT missing, role_name, permission, sql
+FROM permission_fix_sql()
+ORDER BY role_name, permission;
+
+-- a dry run changes nothing
+SELECT count(*) AS statements FROM permission_apply();
+SELECT has_table_privilege('use_direct', 'public.use_t', 'INSERT')
+   AS still_missing;
+
+-- applying it fixes the diff
+SELECT count(*) AS statements FROM permission_apply(false);
+SELECT has_table_privilege('use_direct', 'public.use_t', 'INSERT')
+   AS now_granted;
+SELECT count(*) AS remaining FROM permission_diffs();
+
+DROP TABLE use_t;
+DROP ROLE use_child;
+DROP ROLE use_parent;
+DROP ROLE use_direct;
+DROP ROLE use_owner;

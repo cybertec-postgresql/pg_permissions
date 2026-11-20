@@ -1,0 +1,51 @@
+-- Every supported upgrade step must work, including 1.2 -> 1.3, which used
+-- to be missing entirely.
+\set VERBOSITY terse
+
+DROP EXTENSION pg_permissions CASCADE;
+
+CREATE EXTENSION pg_permissions VERSION '1.0';
+ALTER EXTENSION pg_permissions UPDATE TO '1.1';
+ALTER EXTENSION pg_permissions UPDATE TO '1.2';
+ALTER EXTENSION pg_permissions UPDATE TO '1.3';
+ALTER EXTENSION pg_permissions UPDATE TO '1.4';
+ALTER EXTENSION pg_permissions UPDATE TO '1.5';
+ALTER EXTENSION pg_permissions UPDATE TO '1.6';
+
+SELECT extversion FROM pg_extension WHERE extname = 'pg_permissions';
+
+-- the upgraded installation is functional
+SELECT count(*) AS diffs FROM permission_diffs();
+SELECT count(*) AS default_acl_diffs FROM default_acl_diffs();
+SELECT count(*) AS system_objects FROM table_permissions
+ WHERE schema_name LIKE 'pg\_%';
+
+-- the views are still updatable
+CREATE ROLE upgrade_user;
+CREATE TABLE upgrade_t(a int);
+UPDATE table_permissions SET granted = TRUE
+ WHERE role_name = 'upgrade_user' AND schema_name = 'public'
+   AND object_name = 'upgrade_t' AND permission = 'SELECT';
+SELECT has_table_privilege('upgrade_user', 'public.upgrade_t', 'SELECT')
+   AS grant_works;
+DROP TABLE upgrade_t;
+DROP ROLE upgrade_user;
+
+-- 1.5 -> 1.6 migrates the target table: empty permission lists are dropped,
+-- a COLUMN target without a column name becomes a table-level target, and
+-- duplicates are merged.
+DROP EXTENSION pg_permissions CASCADE;
+CREATE EXTENSION pg_permissions VERSION '1.5';
+CREATE ROLE migrate_user;
+CREATE TABLE migrate_t(a int);
+INSERT INTO permission_target
+   (role_name, permissions, object_type, schema_name, object_name, column_name)
+VALUES ('migrate_user', '{}'::perm_type[], 'TABLE', 'public', 'migrate_t', NULL),
+       ('migrate_user', ARRAY['SELECT']::perm_type[], 'COLUMN', 'public', 'migrate_t', NULL),
+       ('migrate_user', ARRAY['INSERT']::perm_type[], 'TABLE', 'public', 'migrate_t', NULL),
+       ('migrate_user', ARRAY['UPDATE']::perm_type[], 'TABLE', 'public', 'migrate_t', NULL);
+ALTER EXTENSION pg_permissions UPDATE TO '1.6';
+SELECT role_name, permissions, object_type, column_name
+FROM permission_target ORDER BY role_name, object_type;
+DROP TABLE migrate_t;
+DROP ROLE migrate_user;
